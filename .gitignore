@@ -1,0 +1,18 @@
+# Ignorar la configuración y archivos generados por Visual Studio
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+# Archivos generados por el sistema de construcción
+bin/
+obj/
+
+
+# Archivos de log
+*.log
+*.tmp
+*.bak
