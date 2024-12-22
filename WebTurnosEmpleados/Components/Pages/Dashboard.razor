@@ -1,0 +1,185 @@
+﻿@page "/dashboard"
+@using WebTurnosEmpleados.Models
+@using WebTurnosEmpleados.Services
+@inject EmpleadoService EmpleadoService
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    @if (empleadoActual != null)
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Panel de Control</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h4>Información del Empleado</h4>
+                            <p><strong>Nombre:</strong> @empleadoActual.Name @empleadoActual.LastName</p>
+                            <p><strong>Rol:</strong> @empleadoActual.Rol</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        @if (turnoActivo)
+                        {
+                            <div class="alert alert-info">
+                                <h5>Tiempo Trabajando:</h5>
+                                <div class="display-6">@tiempoTranscurrido</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <button class="btn btn-success btn-lg @(turnoActivo ? "disabled" : "")"
+                            @onclick="IniciarTurno" disabled="@turnoActivo">
+                        <i class="oi oi-timer"></i> Iniciar Turno
+                    </button>
+                    <button class="btn btn-danger btn-lg @(!turnoActivo ? "disabled" : "")"
+                            @onclick="TerminarTurno" disabled="@(!turnoActivo)">
+                        <i class="oi oi-media-stop"></i> Terminar Turno
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Historial de Turnos</h3>
+            </div>
+            <div class="card-body">
+                @if (historialTurnos.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Hora Entrada</th>
+                                    <th>Hora Salida</th>
+                                    <th>Tiempo Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var turno in historialTurnos)
+                                {
+                                    <tr>
+                                        <td>@turno.FechaInicio.ToShortDateString()</td>
+                                        <td>@turno.FechaInicio.ToShortTimeString()</td>
+                                        <td>@(turno.FechaFin?.ToShortTimeString() ?? "-")</td>
+                                        <td>@(turno.TiempoTotal?.ToString(@"hh\:mm") ?? "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No hay registros de turnos anteriores.
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            No hay información del empleado disponible.
+            <button class="btn btn-danger" @onclick="VolverAlLogin">Volver al login</button>
+        </div>
+    }
+</div>
+
+@code {
+    private Empleados? empleadoActual;
+    private bool turnoActivo = false;
+    private string tiempoTranscurrido = "00:00";
+    private List<Turno> historialTurnos = new();
+    private System.Threading.Timer? timer;
+    private DateTime? horaInicio;
+
+    protected override async Task OnInitializedAsync()
+    {
+        empleadoActual = EmpleadoService.GetEmpleadoActual();
+        if (empleadoActual == null)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        if (empleadoActual != null)
+        {
+            var turnoActual = await EmpleadoService.GetTurnoActivo(empleadoActual.Id);
+            if (turnoActual != null)
+            {
+                turnoActivo = true;
+                horaInicio = turnoActual.FechaInicio;
+                IniciarContador();
+            }
+
+            historialTurnos = await EmpleadoService.GetHistorialTurnos(empleadoActual.Id);
+        }
+    }
+
+    private void IniciarContador()
+    {
+        timer?.Dispose();
+        timer = new Timer(_ =>
+        {
+            if (horaInicio.HasValue)
+            {
+                var tiempo = DateTime.Now - horaInicio.Value;
+                tiempoTranscurrido = tiempo.ToString(@"hh\:mm\:ss");
+                InvokeAsync(StateHasChanged);
+            }
+        }, null, 0, 1000);
+    }
+
+    private async Task IniciarTurno()
+    {
+        if (empleadoActual != null)
+        {
+            var nuevoTurno = await EmpleadoService.IniciarTurno(empleadoActual.Id);
+            if (nuevoTurno != null)
+            {
+                turnoActivo = true;
+                horaInicio = nuevoTurno.FechaInicio;
+                IniciarContador();
+                await CargarDatos();
+            }
+        }
+    }
+
+    private async Task TerminarTurno()
+    {
+        if (empleadoActual != null)
+        {
+            var resultado = await EmpleadoService.TerminarTurno(empleadoActual.Id);
+            if (resultado)
+            {
+                turnoActivo = false;
+                timer?.Dispose();
+                timer = null;
+                await CargarDatos();
+            }
+        }
+    }
+
+    private void VolverAlLogin()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

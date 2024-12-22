@@ -1,0 +1,92 @@
+﻿@page "/login"
+@using WebTurnosEmpleados.Models;
+@using WebTurnosEmpleados.Services
+@inject EmpleadoService EmpleadoService
+@inject NavigationManager NavigationManager
+
+<div class="container">
+    <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title text-center mb-4">Iniciar Sesión</h3>
+                    <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Usuario:</label>
+                            <InputText @bind-Value="loginModel.Useer" class="form-control" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Contraseña:</label>
+                            <InputText type="password" @bind-Value="loginModel.Password" class="form-control" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">
+                                @errorMessage
+                            </div>
+                        }
+
+                        <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span class="ms-2">Cargando...</span>
+                            }
+                            else
+                            {
+                                <span>Iniciar Sesión</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Empleados loginModel = new();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            // Verificar conexión con la base de datos
+            if (!await EmpleadoService.CheckDatabaseConnection())
+            {
+                errorMessage = "No se pudo conectar con la base de datos";
+                return;
+            }
+
+            // Intentar login
+            var empleadoLogueado = await EmpleadoService.Login(loginModel.Useer, loginModel.Password);
+            
+            if (empleadoLogueado != null)
+            {
+                NavigationManager.NavigateTo("/dashboard");
+            }
+            else
+            {
+                errorMessage = "Usuario o contraseña incorrectos";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al intentar iniciar sesión: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error detallado: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
