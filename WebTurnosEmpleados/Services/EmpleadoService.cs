@@ -142,10 +142,5 @@ namespace WebTurnosEmpleados.Services
         {
             return _empleadoActual;
         }
-
-        public void SetEmpleadoActual(Empleados empleado)
-        {
-            _empleadoActual = empleado;
-        }
     }
 }
